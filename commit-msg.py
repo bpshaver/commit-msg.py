@@ -20,12 +20,12 @@ import re
 import sys
 from typing import Literal
 
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 
-COMMIT_REGEX = re.compile(r"^(\w+)(?:\((\w+)\))?:(.*)$")
+COMMIT_REGEX = re.compile(r"^([a-z]+)(?:\(([a-z|_|-|\/]+)\))?:(.*)$")
 
 TYPES = {"fix", "feat", "docs", "style", "refactor", "test", "chore", "revert"}
-SCOPES = {"git", "python"}
+SCOPES = {"deps", "ci/cd", "packaging", "python", "git"}
 SCOPE_REQUIRED = True
 
 # fmt: off
@@ -61,6 +61,17 @@ def test_validate() -> None:
     assert validate("feat: foobar", {"feat"}, set(), True) == "scope_required"
     assert validate("feat(foobar): foobar", {"feat"}, {"api"}, False) == "scope_failing"
     assert validate("fix -- foobar", {"feat"}, set(), False) == "failing"
+    assert validate("Feat: foobar", {"feat"}, set(), True) == "failing"
+    assert validate("feat(FooBar): foobar", {"feat"}, {"FooBar"}, True) == "failing"
+    assert (
+        validate(
+            "feat(ci/cd): added ruff format --check to ci/cd",
+            {"feat"},
+            {"ci/cd"},
+            scope_required=True,
+        )
+        == "passing"
+    )
 
 
 def main() -> int:
