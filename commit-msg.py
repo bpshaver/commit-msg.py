@@ -1,26 +1,18 @@
 #!/usr/bin/env python
 """
 Python script to enforce conventional commits as a commit message Git hook.
-
-Move this script to `.git/hooks/commit-msg` and customize the constants `TYPES`,
-`SCOPES`, and `SCOPE_REQUIRED` according to your project's needs.
-
-Gone are the days of scrolling `git log` to check what scopes you have used in the past
-in order to use the "correct" scope for your Conventional Commits.
-
-To find the short list of your already used types and scopes (assuming your Git log) is
-complient with conventional commits, try this:
-
-```bash
-git log --no-merges --oneline | awk ' { print $2 } ' | sort | uniq
-```
 """
 
 import re
 import sys
+from pathlib import Path
+from subprocess import CalledProcessError, run
 from typing import Literal
 
-VERSION = "0.1.2"
+VERSION = "0.1.3"
+REMOTE_PATH = (
+    "https://raw.githubusercontent.com/bpshaver/commit-msg.py/main/commit-msg.py"
+)
 
 COMMIT_REGEX = re.compile(r"^([a-z]+)(?:\(([a-z|_|\-|\/]+)\))?:(.*)$")
 
@@ -55,26 +47,75 @@ def validate(
     return "passing"
 
 
-def test_validate() -> None:
-    assert validate("fix: foobar", {"fix"}, set(), False) == "passing"
-    assert validate("fix: foobar", {"feat"}, set(), False) == "type_failing"
-    assert validate("feat: foobar", {"feat"}, set(), True) == "scope_required"
-    assert validate("feat(foobar): foobar", {"feat"}, {"api"}, False) == "scope_failing"
-    assert validate("fix -- foobar", {"feat"}, set(), False) == "failing"
-    assert validate("Feat: foobar", {"feat"}, set(), True) == "failing"
-    assert validate("feat(FooBar): foobar", {"feat"}, {"FooBar"}, True) == "failing"
-    assert (
-        validate(
-            "feat(ci/cd): added ruff format --check to ci/cd",
-            {"feat"},
-            {"ci/cd"},
-            scope_required=True,
-        )
-        == "passing"
+def git_root() -> Path:
+    git_root = run(
+        ["git", "rev-parse", "--show-toplevel"],
+        capture_output=True,
+        check=True,
+        text=True,
     )
+    return Path(git_root.stdout[:-1])
+
+
+def setup() -> int:
+    print("-- SETTING UP COMMIT-MSG.PY", file=sys.stderr)
+    # Check that we're in a Git repo
+    try:
+        _ = run(["git", "status"], capture_output=True, check=True)
+    except CalledProcessError:
+        print("commit-msg.py: not a git repository.", file=sys.stderr)
+        return 1
+
+    # Check if we're installing or if we're updating
+    hook_path = git_root() / ".git/hooks/commit-msg"
+    if hook_path.exists():
+        return update(hook_path)
+    else:
+        return install(hook_path)
+
+
+def update(hook_path: Path):
+    print("-- UPDATING COMMIT-MSG.PY", file=sys.stderr)
+    raise NotImplementedError
+
+
+def install(hook_path: Path):
+    print("-- INSTALLING COMMIT-MSG.PY", file=sys.stderr)
+    # This script must write itself into a file but it can't use the __file__ variable
+    # TODO: Figure out a better way to do this
+    try:
+        curl = run(
+            ["curl", "-s", REMOTE_PATH], capture_output=True, check=True, text=True
+        )
+    except CalledProcessError:
+        print(
+            "commit-msg.py: error downloading commit-msg.py. Install manually.",
+            file=sys.stderr,
+        )
+        return 1
+
+    with hook_path.open("w") as f:
+        f.write(curl.stdout)
+
+    try:
+        run(["chmod", "+x", hook_path], capture_output=True, check=True, text=True)
+    except CalledProcessError:
+        print(
+            "commit-msg.py: error making .git/hooks/commit-msg executable.",
+            file=sys.stderr,
+        )
+        return 1
+
+    print("-- FINISHED INSTALLING COMMIT-MSG.PY", file=sys.stderr)
+    print(hook_path, file=sys.stdout)
+    return 0
 
 
 def main() -> int:
+    # Setup mode is triggered if the script is run via stdin
+    if __file__ == "<stdin>":
+        return setup()
+
     # Check script is being called correctly
     if len(sys.argv) != 2:
         print(".git/hooks/commit-msg: Unexpected number of arguments.", file=sys.stderr)
@@ -121,3 +162,29 @@ def main() -> int:
 
 if __name__ == "__main__":
     exit(main())
+
+
+# Unit Tests
+def test_validate() -> None:
+    assert validate("fix: foobar", {"fix"}, set(), False) == "passing"
+    assert validate("fix: foobar", {"feat"}, set(), False) == "type_failing"
+    assert validate("feat: foobar", {"feat"}, set(), True) == "scope_required"
+    assert validate("feat(foobar): foobar", {"feat"}, {"api"}, False) == "scope_failing"
+    assert validate("fix -- foobar", {"feat"}, set(), False) == "failing"
+    assert validate("Feat: foobar", {"feat"}, set(), True) == "failing"
+    assert validate("feat(FooBar): foobar", {"feat"}, {"FooBar"}, True) == "failing"
+    assert (
+        validate(
+            "feat(ci/cd): added ruff format --check to ci/cd",
+            {"feat"},
+            {"ci/cd"},
+            scope_required=True,
+        )
+        == "passing"
+    )
+
+
+def test_git_root() -> None:
+    gr = git_root()
+
+    assert gr.exists() and gr.name == "commit-msg.py"
