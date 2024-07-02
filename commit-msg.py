@@ -20,9 +20,9 @@ import re
 import sys
 from typing import Literal
 
-VERSION = "0.1.1"
+VERSION = "0.1.2"
 
-COMMIT_REGEX = re.compile(r"^([a-z]+)(?:\(([a-z|_|-|\/]+)\))?:(.*)$")
+COMMIT_REGEX = re.compile(r"^([a-z]+)(?:\(([a-z|_|\-|\/]+)\))?:(.*)$")
 
 TYPES = {"fix", "feat", "docs", "style", "refactor", "test", "chore", "revert"}
 SCOPES = {"deps", "ci/cd", "packaging", "python", "git"}
