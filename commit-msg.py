@@ -11,16 +11,31 @@ from pathlib import Path
 from subprocess import CalledProcessError, run
 from typing import Literal, Set
 
-VERSION = "0.2.1"
+VERSION = "0.2.2"
 REMOTE_PATH = (
     "https://raw.githubusercontent.com/bpshaver/commit-msg.py/main/commit-msg.py"
 )
 
 COMMIT_REGEX = re.compile(r"^([a-z]+)(?:\(([a-z|_|\-|\/]+)\))?:(.*)$")
 
-TYPES = {"fix", "feat", "docs", "style", "refactor", "test", "chore", "revert"}
-SCOPES = {"deps", "ci/cd", "packaging", "python", "git"}
-SCOPE_REQUIRED = True
+## User Config
+## Don't remove type annotations
+
+TYPES: Set[str] = {
+    "fix",
+    "feat",
+    "docs",
+    "style",
+    "refactor",
+    "test",
+    "chore",
+    "revert",
+}
+SCOPES: Set[str] = {"deps", "ci/cd", "packaging", "python", "git"}
+SCOPE_REQUIRED: bool = True
+
+##
+##
 
 # fmt: off
 validation_result = Literal[
@@ -148,17 +163,13 @@ def versions_compatible(current_contents: str, source: str) -> bool:
 
 def swap_out_config(current_contents: str, source: str) -> str:
     debug("PRESERVING CONFIGURATION LINES")
-    config_ptn = (
-        r"\s+TYPES = ({.+})\s+SCOPES = ({.+})\s+SCOPE_REQUIRED = (True|False)\s+"
-    )
+    config_ptn = r"(TYPES: +Set\[str\] += +{[^}]+}\n+SCOPES: +Set\[str\] += +{[^}]*}\n+SCOPE_REQUIRED: +bool += +True|False)"
     match1 = re.search(config_ptn, current_contents)
     match2 = re.search(config_ptn, source)
-    if match1 and match2:
-        old_types, old_scopes, old_scope_reqd = match2.groups()
-        new_types, new_scopes, new_scope_reqd = match1.groups()
-        source = source.replace(old_types, new_types, 1)
-        source = source.replace(old_scopes, new_scopes, 1)
-        source = source.replace(old_scope_reqd, new_scope_reqd, 1)
+    if match1 is not None and match2 is not None:
+        (current_config,) = match1.groups()
+        (source_config,) = match2.groups()
+        source = source.replace(source_config, current_config)
         return source
     else:
         setup_error("error getting config lines to swap over. Update manually.")
@@ -214,15 +225,19 @@ def install(hook_path: Path) -> int:
         setup_error("error downloading commit-msg.py. Install manually.")
 
     debug("INFERRING EXISTING SCOPES")
-    es = existing_scopes()
-    if not es:
-        t = "SCOPES = {}"
+    scopes = existing_scopes()
+    if not scopes:
+        scopes_str = "SCOPES: Set[str] = set()"
     else:
-        t = "SCOPES = {" + ", ".join(['"' + scope + '"' for scope in es]) + "}"
+        scopes_str = (
+            "SCOPES: Set[str] = {"
+            + ", ".join(['"' + scope + '"' for scope in scopes])
+            + "}"
+        )
 
-    scopes_ptn = r"SCOPES = ({.+})"
+    scopes_ptn = r"SCOPES: +Set\[str\] += +({.+})"
 
-    source = re.sub(scopes_ptn, t, source)
+    source = re.sub(scopes_ptn, scopes_str, source)
 
     with hook_path.open("w") as f:
         f.write(source)
@@ -323,30 +338,32 @@ def test_versions_compatible() -> None:
 
 
 def test_swap_out_configs() -> None:
-    old = """
-    old stuff...         
-    TYPES = {"fix", "feat"}
-    SCOPES = {"thing1", "thing2"}
-    SCOPE_REQUIRED = True
-    old stuff...
-    """
-    new = """
-    new stuff...         
-    TYPES = {"fix", "feat", "docs", "style", "refactor", "test", "chore", "revert"}
-    SCOPES = {"deps", "ci/cd", "packaging", "python", "git"}
-    SCOPE_REQUIRED = True
-    new stuff...
-    """
+    def fix(s: str) -> str:
+        """Strip the test> prefix which exists so these lines are ignored by the regular
+        runtime behavior of the script."""
+        return s.replace("test>", "")
+
+    old = fix("""
+    test>old stuff...         
+    test>TYPES: Set[str] = {"fix", "feat"}
+    test>SCOPES: Set[str] = {"thing1", "thing2"}
+    test>SCOPE_REQUIRED: bool = True
+    test>old stuff...
+    """)
+    new = fix("""
+    test>new stuff...         
+    test>TYPES: Set[str] = {"fix", "feat", "docs", "style", "refactor", "test", "chore", "revert"}
+    test>SCOPES: Set[str] = {"deps", "ci/cd", "packaging", "python", "git"}
+    test>SCOPE_REQUIRED: bool = True
+    test>new stuff...
+    """)
 
     updated = swap_out_config(old, new)
 
-    assert (
-        updated
-        == """
-    new stuff...         
-    TYPES = {"fix", "feat"}
-    SCOPES = {"thing1", "thing2"}
-    SCOPE_REQUIRED = True
-    new stuff...
-    """
-    )
+    assert updated == fix("""
+    test>new stuff...         
+    test>TYPES: Set[str] = {"fix", "feat"}
+    test>SCOPES: Set[str] = {"thing1", "thing2"}
+    test>SCOPE_REQUIRED: bool = True
+    test>new stuff...
+    """)
