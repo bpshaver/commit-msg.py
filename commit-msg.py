@@ -11,7 +11,7 @@ from pathlib import Path
 from subprocess import CalledProcessError, run
 from typing import Literal, Set
 
-VERSION = "0.2.0"
+VERSION = "0.2.1"
 REMOTE_PATH = (
     "https://raw.githubusercontent.com/bpshaver/commit-msg.py/main/commit-msg.py"
 )
@@ -193,6 +193,18 @@ def update(hook_path: Path) -> int:
     return 0
 
 
+def existing_scopes() -> Set[str]:
+    scopes = set()
+    result = run(
+        "git log --no-merges --oneline".split(), capture_output=True, check=True
+    )
+    for line in result.stdout.decode().split("\n"):
+        match = re.match(r"[a-z|0-9]{7} [a-z]+\(([a-z|_|\-|\/]+)\): ", line)
+        if match:
+            scopes.add(match.group(1))
+    return scopes
+
+
 def install(hook_path: Path) -> int:
     debug("INSTALLING COMMIT-MSG.PY")
 
@@ -200,6 +212,17 @@ def install(hook_path: Path) -> int:
         source = get_source()
     except CalledProcessError:
         setup_error("error downloading commit-msg.py. Install manually.")
+
+    debug("INFERRING EXISTING SCOPES")
+    es = existing_scopes()
+    if not es:
+        t = "SCOPES = {}"
+    else:
+        t = "SCOPES = {" + ", ".join(['"' + scope + '"' for scope in es]) + "}"
+
+    scopes_ptn = r"SCOPES = ({.+})"
+
+    source = re.sub(scopes_ptn, t, source)
 
     with hook_path.open("w") as f:
         f.write(source)
