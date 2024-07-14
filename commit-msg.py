@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 """
 Python script to enforce conventional commits as a commit message Git hook.
+
+commit-msg.py
 """
 
 import re
@@ -9,7 +11,7 @@ from pathlib import Path
 from subprocess import CalledProcessError, run
 from typing import Literal, Set
 
-VERSION = "0.1.4"
+VERSION = "0.2.0"
 REMOTE_PATH = (
     "https://raw.githubusercontent.com/bpshaver/commit-msg.py/main/commit-msg.py"
 )
@@ -29,6 +31,33 @@ validation_result = Literal[
     "scope_required"
 ]
 # fmt: on
+
+
+def debug(msg: str) -> None:
+    if not msg.endswith("."):
+        msg = msg + "."
+    print(
+        f"-- {msg.upper()}",
+        file=sys.stderr,
+    )
+
+
+def error(msg: str) -> None:
+    if not msg.endswith("."):
+        msg = msg + "."
+    print(
+        f".git/hooks/commit-msg: {msg}",
+        file=sys.stderr,
+    )
+
+
+def setup_error(msg: str) -> None:
+    if not msg.endswith("."):
+        msg = msg + "."
+    print(
+        f"commit-msg.py: {msg}",
+        file=sys.stderr,
+    )
 
 
 def validate(
@@ -58,12 +87,12 @@ def git_root() -> Path:
 
 
 def setup() -> int:
-    print("-- SETTING UP COMMIT-MSG.PY", file=sys.stderr)
+    debug("SETTING UP COMMIT-MSG.PY")
     # Check that we're in a Git repo
     try:
         _ = run(["git", "status"], capture_output=True, check=True)
     except CalledProcessError:
-        print("commit-msg.py: not a git repository.", file=sys.stderr)
+        setup_error("not a git repository. Set up manually.")
         return 1
 
     # Check if we're installing or if we're updating
@@ -74,39 +103,116 @@ def setup() -> int:
         return install(hook_path)
 
 
-def update(hook_path: Path):
-    print("-- UPDATING COMMIT-MSG.PY", file=sys.stderr)
-    raise NotImplementedError
-
-
-def install(hook_path: Path):
-    print("-- INSTALLING COMMIT-MSG.PY", file=sys.stderr)
+def get_source() -> str:
     # This script must write itself into a file but it can't use the __file__ variable
-    # TODO: Figure out a better way to do this
+    curl = run(["curl", "-s", REMOTE_PATH], capture_output=True, check=True, text=True)
+    return curl.stdout
+
+
+def versions_compatible(current_contents: str, source: str) -> bool:
+    debug("CHECKING VERSION COMPATIBILITY")
+    if "\ncommit-msg.py\n" not in current_contents:
+        setup_error("it looks like you're not running commit-msg.py. Update manually.")
+        return False
+    else:
+        version_ptn = r'\nVERSION = "((\d+)\.(\d+)\.(\d+))"\n'
+        old_version = re.search(version_ptn, current_contents)
+        new_version = re.search(version_ptn, source)
+
+        if not old_version:
+            setup_error(
+                "unable to retrieve current version of commit-msg.py. Update manually.",
+            )
+            return False
+        if not new_version:
+            setup_error(
+                "unable to retrieve new version of commit-msg.py. Update manually.",
+            )
+            return False
+
+        old_version_str, old_major, old_minor, old_patch = old_version.groups()
+        new_version_str, new_major, new_minor, new_patch = new_version.groups()
+        if new_version_str == old_version_str:
+            setup_error("already up-to-date.")
+            return False
+        elif new_major == old_major and (
+            new_minor > old_minor or (new_minor == old_minor and new_patch > old_patch)
+        ):
+            return True
+        else:
+            setup_error(
+                f"new version {old_version_str} not compatible with existing version {new_version_str}. Update manually"
+            )
+            return False
+
+
+def swap_out_config(current_contents: str, source: str) -> str:
+    debug("PRESERVING CONFIGURATION LINES")
+    config_ptn = (
+        r"\s+TYPES = ({.+})\s+SCOPES = ({.+})\s+SCOPE_REQUIRED = (True|False)\s+"
+    )
+    match1 = re.search(config_ptn, current_contents)
+    match2 = re.search(config_ptn, source)
+    if match1 and match2:
+        old_types, old_scopes, old_scope_reqd = match2.groups()
+        new_types, new_scopes, new_scope_reqd = match1.groups()
+        source = source.replace(old_types, new_types, 1)
+        source = source.replace(old_scopes, new_scopes, 1)
+        source = source.replace(old_scope_reqd, new_scope_reqd, 1)
+        return source
+    else:
+        setup_error("error getting config lines to swap over. Update manually.")
+        return ""
+
+
+def update(hook_path: Path) -> int:
+    debug("UPDATING COMMIT-MSG.PY")
+
     try:
-        curl = run(
-            ["curl", "-s", REMOTE_PATH], capture_output=True, check=True, text=True
-        )
+        source = get_source()
     except CalledProcessError:
-        print(
-            "commit-msg.py: error downloading commit-msg.py. Install manually.",
-            file=sys.stderr,
+        setup_error(
+            "error downloading commit-msg.py. Update manually.",
         )
         return 1
 
+    with hook_path.open() as f:
+        current_contents = f.read()
+    if versions_compatible(current_contents, source):
+        new_source = swap_out_config(current_contents, source)
+        if new_source:
+            with hook_path.open("w") as f:
+                f.write(new_source)
+        else:
+            return 1
+    else:
+        return 1
+
+    debug("FINISHED UPDATING COMMIT-MSG.PY")
+    print(hook_path, file=sys.stdout)
+    return 0
+
+
+def install(hook_path: Path) -> int:
+    debug("INSTALLING COMMIT-MSG.PY")
+
+    try:
+        source = get_source()
+    except CalledProcessError:
+        setup_error("error downloading commit-msg.py. Install manually.")
+
     with hook_path.open("w") as f:
-        f.write(curl.stdout)
+        f.write(source)
 
     try:
         run(["chmod", "+x", hook_path], capture_output=True, check=True, text=True)
     except CalledProcessError:
-        print(
-            "commit-msg.py: error making .git/hooks/commit-msg executable.",
-            file=sys.stderr,
+        setup_error(
+            "error making .git/hooks/commit-msg executable. Install manually.",
         )
         return 1
 
-    print("-- FINISHED INSTALLING COMMIT-MSG.PY", file=sys.stderr)
+    debug("FINISHED INSTALLING COMMIT-MSG.PY")
     print(hook_path, file=sys.stdout)
     return 0
 
@@ -118,7 +224,7 @@ def main() -> int:
 
     # Check script is being called correctly
     if len(sys.argv) != 2:
-        print(".git/hooks/commit-msg: Unexpected number of arguments.", file=sys.stderr)
+        error("Unexpected number of arguments.")
         return 1
 
     # Get commit message
@@ -126,7 +232,7 @@ def main() -> int:
         with open(sys.argv[1], "r") as f:
             msg = f.read().strip()
     except FileNotFoundError:
-        print(".git/hooks/commit-msg: File not found.", file=sys.stderr)
+        error("File not found.")
         return 1
 
     # Validate commit message
@@ -134,27 +240,23 @@ def main() -> int:
     if validation == "passing":
         return 0
     if validation == "failing":
-        print(
-            ".git/hooks/commit-msg: Bad commit format. Please use `type(scope): description`",
-            file=sys.stderr,
+        error(
+            "Bad commit format. Please use `type(scope): description`",
         )
         return 1
     if validation == "type_failing":
-        print(
-            f".git/hooks/commit-msg: Bad commit msg type. Allowed types are {TYPES}",
-            file=sys.stderr,
+        error(
+            f"Bad commit msg type. Allowed types are {TYPES}",
         )
         return 1
     if validation == "scope_failing":
-        print(
-            f".git/hooks/commit-msg: Bad commit msg scope. Allowed scopes are {SCOPES}",
-            file=sys.stderr,
+        error(
+            f"Bad commit msg scope. Allowed scopes are {SCOPES}",
         )
         return 1
     if validation == "scope_required":
-        print(
-            f".git/hooks/commit-msg: A scope is required. Allowed scopes are {SCOPES}",
-            file=sys.stderr,
+        error(
+            f"A scope is required. Allowed scopes are {SCOPES}",
         )
         return 1
     raise NotImplementedError
@@ -188,3 +290,40 @@ def test_git_root() -> None:
     gr = git_root()
 
     assert gr.exists() and gr.name == "commit-msg.py"
+
+
+def test_versions_compatible() -> None:
+    current_contents = '\n\ncommit-msg.py\nVERSION = "1.1.0"\n'
+    source = '\n\ncommit-msg.py\nVERSION = "1.2.1"\n'
+
+    assert versions_compatible(current_contents, source)
+
+
+def test_swap_out_configs() -> None:
+    old = """
+    old stuff...         
+    TYPES = {"fix", "feat"}
+    SCOPES = {"thing1", "thing2"}
+    SCOPE_REQUIRED = True
+    old stuff...
+    """
+    new = """
+    new stuff...         
+    TYPES = {"fix", "feat", "docs", "style", "refactor", "test", "chore", "revert"}
+    SCOPES = {"deps", "ci/cd", "packaging", "python", "git"}
+    SCOPE_REQUIRED = True
+    new stuff...
+    """
+
+    updated = swap_out_config(old, new)
+
+    assert (
+        updated
+        == """
+    new stuff...         
+    TYPES = {"fix", "feat"}
+    SCOPES = {"thing1", "thing2"}
+    SCOPE_REQUIRED = True
+    new stuff...
+    """
+    )
