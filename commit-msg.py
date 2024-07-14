@@ -7,9 +7,9 @@ import re
 import sys
 from pathlib import Path
 from subprocess import CalledProcessError, run
-from typing import Literal
+from typing import Literal, Set
 
-VERSION = "0.1.3"
+VERSION = "0.1.4"
 REMOTE_PATH = (
     "https://raw.githubusercontent.com/bpshaver/commit-msg.py/main/commit-msg.py"
 )
@@ -32,7 +32,7 @@ validation_result = Literal[
 
 
 def validate(
-    msg: str, types: set[str], scopes: set[str], scope_required: bool
+    msg: str, types: Set[str], scopes: Set[str], scope_required: bool
 ) -> validation_result:
     match = re.match(COMMIT_REGEX, msg)
     if not match:
