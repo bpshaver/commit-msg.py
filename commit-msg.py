@@ -9,9 +9,9 @@ import re
 import sys
 from pathlib import Path
 from subprocess import CalledProcessError, run
-from typing import Literal, Set
+from typing import Literal
 
-VERSION = "0.2.2"
+VERSION = "0.2.3"
 REMOTE_PATH = (
     "https://raw.githubusercontent.com/bpshaver/commit-msg.py/main/commit-msg.py"
 )
@@ -21,7 +21,7 @@ COMMIT_REGEX = re.compile(r"^([a-z]+)(?:\(([a-z|_|\-|\/]+)\))?:(.*)$")
 ## User Config
 ## Don't remove type annotations
 
-TYPES: Set[str] = {
+TYPES: set[str] = {
     "fix",
     "feat",
     "docs",
@@ -31,7 +31,7 @@ TYPES: Set[str] = {
     "chore",
     "revert",
 }
-SCOPES: Set[str] = {"deps", "ci/cd", "packaging", "python", "git"}
+SCOPES: set[str] = {"deps", "ci/cd", "packaging", "python", "git"}
 SCOPE_REQUIRED: bool = True
 
 ##
