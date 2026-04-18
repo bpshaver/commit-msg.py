@@ -76,7 +76,7 @@ def setup_error(msg: str) -> None:
 
 
 def validate(
-    msg: str, types: Set[str], scopes: Set[str], scope_required: bool
+    msg: str, types: set[str], scopes: set[str], scope_required: bool
 ) -> validation_result:
     match = re.match(COMMIT_REGEX, msg)
     if not match:
@@ -163,7 +163,7 @@ def versions_compatible(current_contents: str, source: str) -> bool:
 
 def swap_out_config(current_contents: str, source: str) -> str:
     debug("PRESERVING CONFIGURATION LINES")
-    config_ptn = r"(TYPES: +Set\[str\] += +{[^}]+}\n+SCOPES: +Set\[str\] += +{[^}]*}\n+SCOPE_REQUIRED: +bool += +True|False)"
+    config_ptn = r"(TYPES: +set\[str\] += +{[^}]+}\n+SCOPES: +set\[str\] += +{[^}]*}\n+SCOPE_REQUIRED: +bool += +True|False)"
     match1 = re.search(config_ptn, current_contents)
     match2 = re.search(config_ptn, source)
     if match1 is not None and match2 is not None:
@@ -204,7 +204,7 @@ def update(hook_path: Path) -> int:
     return 0
 
 
-def existing_scopes() -> Set[str]:
+def existing_scopes() -> set[str]:
     scopes = set()
     result = run(
         "git log --no-merges --oneline".split(), capture_output=True, check=True
@@ -227,10 +227,10 @@ def install(hook_path: Path) -> int:
     debug("INFERRING EXISTING SCOPES")
     scopes = existing_scopes()
     if not scopes:
-        scopes_str = "SCOPES: Set[str] = set()"
+        scopes_str = "SCOPES: set[str] = set()"
     else:
         scopes_str = (
-            "SCOPES: Set[str] = {"
+            "SCOPES: set[str] = {"
             + ", ".join(['"' + scope + '"' for scope in scopes])
             + "}"
         )
@@ -345,15 +345,15 @@ def test_swap_out_configs() -> None:
 
     old = fix("""
     test>old stuff...         
-    test>TYPES: Set[str] = {"fix", "feat"}
-    test>SCOPES: Set[str] = {"thing1", "thing2"}
+    test>TYPES: set[str] = {"fix", "feat"}
+    test>SCOPES: set[str] = {"thing1", "thing2"}
     test>SCOPE_REQUIRED: bool = True
     test>old stuff...
     """)
     new = fix("""
     test>new stuff...         
-    test>TYPES: Set[str] = {"fix", "feat", "docs", "style", "refactor", "test", "chore", "revert"}
-    test>SCOPES: Set[str] = {"deps", "ci/cd", "packaging", "python", "git"}
+    test>TYPES: set[str] = {"fix", "feat", "docs", "style", "refactor", "test", "chore", "revert"}
+    test>SCOPES: set[str] = {"deps", "ci/cd", "packaging", "python", "git"}
     test>SCOPE_REQUIRED: bool = True
     test>new stuff...
     """)
@@ -362,8 +362,8 @@ def test_swap_out_configs() -> None:
 
     assert updated == fix("""
     test>new stuff...         
-    test>TYPES: Set[str] = {"fix", "feat"}
-    test>SCOPES: Set[str] = {"thing1", "thing2"}
+    test>TYPES: set[str] = {"fix", "feat"}
+    test>SCOPES: set[str] = {"thing1", "thing2"}
     test>SCOPE_REQUIRED: bool = True
     test>new stuff...
     """)
