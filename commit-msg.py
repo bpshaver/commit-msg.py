@@ -11,7 +11,7 @@ from pathlib import Path
 from subprocess import CalledProcessError, run
 from typing import Literal
 
-VERSION = "0.2.3"
+VERSION = "0.3.0"
 REMOTE_PATH = (
     "https://raw.githubusercontent.com/bpshaver/commit-msg.py/main/commit-msg.py"
 )
@@ -32,7 +32,7 @@ TYPES: set[str] = {
     "revert",
 }
 SCOPES: set[str] = {"deps", "ci/cd", "packaging", "python", "git"}
-SCOPE_REQUIRED: bool = True
+SCOPE_REQUIRED: bool = False
 
 ##
 ##
