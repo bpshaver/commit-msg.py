@@ -11,12 +11,12 @@ from pathlib import Path
 from subprocess import CalledProcessError, run
 from typing import Literal
 
-VERSION = "0.3.0"
+VERSION = "0.3.1"
 REMOTE_PATH = (
     "https://raw.githubusercontent.com/bpshaver/commit-msg.py/main/commit-msg.py"
 )
 
-COMMIT_REGEX = re.compile(r"^([a-z]+)(?:\(([a-z|_|\-|\/]+)\))?:(.*)$")
+COMMIT_REGEX = re.compile(r"^([a-z]+)(?:\(([a-z0-9_/-]+)\))?:\s*(\S.*)$")
 
 ## User Config
 ## Don't remove type annotations
@@ -311,8 +311,11 @@ def test_validate() -> None:
     assert validate("feat: foobar", {"feat"}, set(), True) == "scope_required"
     assert validate("feat(foobar): foobar", {"feat"}, {"api"}, False) == "scope_failing"
     assert validate("fix -- foobar", {"feat"}, set(), False) == "failing"
+    assert validate("fix:", {"fix"}, set(), False) == "failing"
+    assert validate("fix:   ", {"fix"}, set(), False) == "failing"
     assert validate("Feat: foobar", {"feat"}, set(), True) == "failing"
     assert validate("feat(FooBar): foobar", {"feat"}, {"FooBar"}, True) == "failing"
+    assert validate("feat(foo|bar): foobar", {"feat"}, {"foo|bar"}, True) == "failing"
     assert (
         validate(
             "feat(ci/cd): added ruff format --check to ci/cd",
