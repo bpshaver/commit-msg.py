@@ -11,7 +11,7 @@ from pathlib import Path
 from subprocess import CalledProcessError, run
 from typing import Literal
 
-VERSION = "0.3.0"
+VERSION = "0.3.1"
 REMOTE_PATH = (
     "https://raw.githubusercontent.com/bpshaver/commit-msg.py/main/commit-msg.py"
 )
@@ -207,10 +207,13 @@ def update(hook_path: Path) -> int:
 def existing_scopes() -> set[str]:
     scopes = set()
     result = run(
-        "git log --no-merges --oneline".split(), capture_output=True, check=True
+        ["git", "log", "--no-merges", "--format=%s"],
+        capture_output=True,
+        check=True,
+        text=True,
     )
-    for line in result.stdout.decode().split("\n"):
-        match = re.match(r"[a-z|0-9]{7} [a-z]+\(([a-z|_|\-|\/]+)\): ", line)
+    for line in result.stdout.splitlines():
+        match = re.match(r"[a-z]+\(([a-z|_|\-|\/]+)\): ", line)
         if match:
             scopes.add(match.group(1))
     return scopes
