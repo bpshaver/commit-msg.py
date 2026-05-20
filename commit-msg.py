@@ -11,7 +11,7 @@ from pathlib import Path
 from subprocess import CalledProcessError, run
 from typing import Literal
 
-VERSION = "0.3.0"
+VERSION = "0.3.1"
 REMOTE_PATH = (
     "https://raw.githubusercontent.com/bpshaver/commit-msg.py/main/commit-msg.py"
 )
@@ -223,6 +223,7 @@ def install(hook_path: Path) -> int:
         source = get_source()
     except CalledProcessError:
         setup_error("error downloading commit-msg.py. Install manually.")
+        return 1
 
     debug("INFERRING EXISTING SCOPES")
     scopes = existing_scopes()
