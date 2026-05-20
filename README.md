@@ -8,7 +8,7 @@ Python script to enforce conventional commits as a commit message Git hook.
 
 ## Installation
 
-`curl -s https://raw.githubusercontent.com/bpshaver/commit-msg.py/main/commit-msg.py | python`
+`curl -s https://raw.githubusercontent.com/bpshaver/commit-msg.py/main/commit-msg.py | python3`
 
 Or manually move `commit-msg.py` to `.git/hooks/commit-msg`
 

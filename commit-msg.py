@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
 Python script to enforce conventional commits as a commit message Git hook.
 
@@ -11,7 +11,7 @@ from pathlib import Path
 from subprocess import CalledProcessError, run
 from typing import Literal
 
-VERSION = "0.3.0"
+VERSION = "0.3.1"
 REMOTE_PATH = (
     "https://raw.githubusercontent.com/bpshaver/commit-msg.py/main/commit-msg.py"
 )
