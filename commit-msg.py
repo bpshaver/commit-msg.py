@@ -11,7 +11,7 @@ from pathlib import Path
 from subprocess import CalledProcessError, run
 from typing import Literal
 
-VERSION = "0.3.0"
+VERSION = "0.3.1"
 REMOTE_PATH = (
     "https://raw.githubusercontent.com/bpshaver/commit-msg.py/main/commit-msg.py"
 )
@@ -147,16 +147,16 @@ def versions_compatible(current_contents: str, source: str) -> bool:
 
         old_version_str, old_major, old_minor, old_patch = old_version.groups()
         new_version_str, new_major, new_minor, new_patch = new_version.groups()
+        old_version_tuple = tuple(int(part) for part in (old_major, old_minor, old_patch))
+        new_version_tuple = tuple(int(part) for part in (new_major, new_minor, new_patch))
         if new_version_str == old_version_str:
             setup_error("already up-to-date.")
             return False
-        elif new_major == old_major and (
-            new_minor > old_minor or (new_minor == old_minor and new_patch > old_patch)
-        ):
+        elif new_major == old_major and new_version_tuple > old_version_tuple:
             return True
         else:
             setup_error(
-                f"new version {old_version_str} not compatible with existing version {new_version_str}. Update manually"
+                f"new version {new_version_str} not compatible with existing version {old_version_str}. Update manually"
             )
             return False
 
