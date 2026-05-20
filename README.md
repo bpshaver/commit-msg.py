@@ -23,7 +23,7 @@ The script is meant to be edited.
 
 Run the inline unit tests with:
 
-`python3 -m pytest -q commit-msg.py`
+`pytest commit-msg.py`
 
 ## Tips
 
