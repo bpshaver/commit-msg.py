@@ -19,6 +19,12 @@ The script is meant to be edited.
 - Customize the constants `TYPES`, `SCOPES`, and `SCOPE_REQUIRED` according to your project's needs.
 - If Git fails to run the script using a Python interpreter, you may need to adjust the shebang.
 
+## Unit tests
+
+Run the inline unit tests with:
+
+`python3 -m pytest -q commit-msg.py`
+
 ## Tips
 
 - To find the short list of your already used types and scopes (assuming your Git log is compliant with

@@ -11,18 +11,24 @@ from pathlib import Path
 from subprocess import CalledProcessError, run
 from typing import Literal
 
-VERSION = "0.3.0"
+VERSION = "0.4.0"
 REMOTE_PATH = (
     "https://raw.githubusercontent.com/bpshaver/commit-msg.py/main/commit-msg.py"
 )
 
-COMMIT_REGEX = re.compile(r"^([a-z]+)(?:\(([a-z|_|\-|\/]+)\))?:(.*)$")
+COMMIT_REGEX = re.compile(r"^([a-z]+)(?:\(([a-z|_|\-|\/]+)\))?!?:(.*)$")
+CONFIG_REGEX = re.compile(
+    r"([ \t]*TYPES:\s+set\[str\]\s*=\s*\{[^}]+\}\n"
+    r"[ \t]*SCOPES:\s+set\[str\]\s*=\s*\{[^}]*\}\n"
+    r"[ \t]*SCOPE_REQUIRED:\s+bool\s*=\s*(?:True|False))"
+)
 
 ## User Config
 ## Don't remove type annotations
 
 TYPES: set[str] = {
     "fix",
+    "hotfix",
     "feat",
     "docs",
     "style",
@@ -78,7 +84,8 @@ def setup_error(msg: str) -> None:
 def validate(
     msg: str, types: set[str], scopes: set[str], scope_required: bool
 ) -> validation_result:
-    match = re.match(COMMIT_REGEX, msg)
+    subject = msg.splitlines()[0] if msg else ""
+    match = re.match(COMMIT_REGEX, subject)
     if not match:
         return "failing"
     type, scope, msg = match.groups()
@@ -163,9 +170,8 @@ def versions_compatible(current_contents: str, source: str) -> bool:
 
 def swap_out_config(current_contents: str, source: str) -> str:
     debug("PRESERVING CONFIGURATION LINES")
-    config_ptn = r"(TYPES: +set\[str\] += +{[^}]+}\n+SCOPES: +set\[str\] += +{[^}]*}\n+SCOPE_REQUIRED: +bool += +True|False)"
-    match1 = re.search(config_ptn, current_contents)
-    match2 = re.search(config_ptn, source)
+    match1 = re.search(CONFIG_REGEX, current_contents)
+    match2 = re.search(CONFIG_REGEX, source)
     if match1 is not None and match2 is not None:
         (current_config,) = match1.groups()
         (source_config,) = match2.groups()
@@ -307,6 +313,13 @@ if __name__ == "__main__":
 # Unit Tests
 def test_validate() -> None:
     assert validate("fix: foobar", {"fix"}, set(), False) == "passing"
+    assert validate("hotfix: foobar", {"hotfix"}, set(), False) == "passing"
+    assert validate("feat!: foobar", {"feat"}, set(), False) == "passing"
+    assert validate("feat(api)!: foobar", {"feat"}, {"api"}, False) == "passing"
+    assert (
+        validate("feat: foobar\n\nLonger body text.", {"feat"}, set(), False)
+        == "passing"
+    )
     assert validate("fix: foobar", {"feat"}, set(), False) == "type_failing"
     assert validate("feat: foobar", {"feat"}, set(), True) == "scope_required"
     assert validate("feat(foobar): foobar", {"feat"}, {"api"}, False) == "scope_failing"
@@ -327,7 +340,7 @@ def test_validate() -> None:
 def test_git_root() -> None:
     gr = git_root()
 
-    assert gr.exists() and gr.name == "commit-msg.py"
+    assert gr.exists() and (gr / "commit-msg.py").exists()
 
 
 def test_versions_compatible() -> None:
@@ -352,7 +365,7 @@ def test_swap_out_configs() -> None:
     """)
     new = fix("""
     test>new stuff...         
-    test>TYPES: set[str] = {"fix", "feat", "docs", "style", "refactor", "test", "chore", "revert"}
+    test>TYPES: set[str] = {"fix", "hotfix", "feat", "docs", "style", "refactor", "test", "chore", "revert"}
     test>SCOPES: set[str] = {"deps", "ci/cd", "packaging", "python", "git"}
     test>SCOPE_REQUIRED: bool = True
     test>new stuff...
