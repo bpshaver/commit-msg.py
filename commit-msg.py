@@ -11,15 +11,15 @@ from pathlib import Path
 from subprocess import CalledProcessError, run
 from typing import Literal
 
-VERSION = "0.4.0"
+VERSION = "0.3.1"
 REMOTE_PATH = (
     "https://raw.githubusercontent.com/bpshaver/commit-msg.py/main/commit-msg.py"
 )
 
-COMMIT_REGEX = re.compile(r"^([a-z]+)(?:\(([a-z|_|\-|\/]+)\))?!?:(.*)$")
+COMMIT_REGEX = re.compile(r"^([a-z]+)(?:\(([a-z|_|\-|\/]+)\))?:(.*)$")
 CONFIG_REGEX = re.compile(
-    r"([ \t]*TYPES:\s+set\[str\]\s*=\s*\{[^}]+\}\n"
-    r"[ \t]*SCOPES:\s+set\[str\]\s*=\s*\{[^}]*\}\n"
+    r"([ \t]*TYPES:\s+(?:set|Set)\[str\]\s*=\s*(?:\{[^}]*\}|set\(\))\n"
+    r"[ \t]*SCOPES:\s+(?:set|Set)\[str\]\s*=\s*(?:\{[^}]*\}|set\(\))\n"
     r"[ \t]*SCOPE_REQUIRED:\s+bool\s*=\s*(?:True|False))"
 )
 
@@ -229,6 +229,7 @@ def install(hook_path: Path) -> int:
         source = get_source()
     except CalledProcessError:
         setup_error("error downloading commit-msg.py. Install manually.")
+        return 1
 
     debug("INFERRING EXISTING SCOPES")
     scopes = existing_scopes()
@@ -241,7 +242,7 @@ def install(hook_path: Path) -> int:
             + "}"
         )
 
-    scopes_ptn = r"SCOPES: +Set\[str\] += +({.+})"
+    scopes_ptn = r"SCOPES: +(set|Set)\[str\] += +(\{[^}]*\}|set\(\))"
 
     source = re.sub(scopes_ptn, scopes_str, source)
 
