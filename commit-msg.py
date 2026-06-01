@@ -28,6 +28,7 @@ CONFIG_REGEX = re.compile(
 
 TYPES: set[str] = {
     "fix",
+    "hotfix",
     "feat",
     "docs",
     "style",
@@ -83,7 +84,8 @@ def setup_error(msg: str) -> None:
 def validate(
     msg: str, types: set[str], scopes: set[str], scope_required: bool
 ) -> validation_result:
-    match = re.match(COMMIT_REGEX, msg)
+    subject = msg.splitlines()[0] if msg else ""
+    match = re.match(COMMIT_REGEX, subject)
     if not match:
         return "failing"
     type, scope, msg = match.groups()
@@ -312,6 +314,13 @@ if __name__ == "__main__":
 # Unit Tests
 def test_validate() -> None:
     assert validate("fix: foobar", {"fix"}, set(), False) == "passing"
+    assert validate("hotfix: foobar", {"hotfix"}, set(), False) == "passing"
+    assert validate("feat!: foobar", {"feat"}, set(), False) == "passing"
+    assert validate("feat(api)!: foobar", {"feat"}, {"api"}, False) == "passing"
+    assert (
+        validate("feat: foobar\n\nLonger body text.", {"feat"}, set(), False)
+        == "passing"
+    )
     assert validate("fix: foobar", {"feat"}, set(), False) == "type_failing"
     assert validate("feat: foobar", {"feat"}, set(), True) == "scope_required"
     assert validate("feat(foobar): foobar", {"feat"}, {"api"}, False) == "scope_failing"
@@ -357,7 +366,7 @@ def test_swap_out_configs() -> None:
     """)
     new = fix("""
     test>new stuff...         
-    test>TYPES: set[str] = {"fix", "feat", "docs", "style", "refactor", "test", "chore", "revert"}
+    test>TYPES: set[str] = {"fix", "hotfix", "feat", "docs", "style", "refactor", "test", "chore", "revert"}
     test>SCOPES: set[str] = {"deps", "ci/cd", "packaging", "python", "git"}
     test>SCOPE_REQUIRED: bool = True
     test>new stuff...
