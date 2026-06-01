@@ -17,6 +17,11 @@ REMOTE_PATH = (
 )
 
 COMMIT_REGEX = re.compile(r"^([a-z]+)(?:\(([a-z|_|\-|\/]+)\))?:(.*)$")
+CONFIG_REGEX = re.compile(
+    r"([ \t]*TYPES:\s+(?:set|Set)\[str\]\s*=\s*(?:\{[^}]*\}|set\(\))\n"
+    r"[ \t]*SCOPES:\s+(?:set|Set)\[str\]\s*=\s*(?:\{[^}]*\}|set\(\))\n"
+    r"[ \t]*SCOPE_REQUIRED:\s+bool\s*=\s*(?:True|False))"
+)
 
 ## User Config
 ## Don't remove type annotations
@@ -163,9 +168,8 @@ def versions_compatible(current_contents: str, source: str) -> bool:
 
 def swap_out_config(current_contents: str, source: str) -> str:
     debug("PRESERVING CONFIGURATION LINES")
-    config_ptn = r"(TYPES: +set\[str\] += +{[^}]+}\n+SCOPES: +set\[str\] += +{[^}]*}\n+SCOPE_REQUIRED: +bool += +True|False)"
-    match1 = re.search(config_ptn, current_contents)
-    match2 = re.search(config_ptn, source)
+    match1 = re.search(CONFIG_REGEX, current_contents)
+    match2 = re.search(CONFIG_REGEX, source)
     if match1 is not None and match2 is not None:
         (current_config,) = match1.groups()
         (source_config,) = match2.groups()
@@ -235,7 +239,7 @@ def install(hook_path: Path) -> int:
             + "}"
         )
 
-    scopes_ptn = r"SCOPES: +Set\[str\] += +({.+})"
+    scopes_ptn = r"SCOPES: +(set|Set)\[str\] += +(\{[^}]*\}|set\(\))"
 
     source = re.sub(scopes_ptn, scopes_str, source)
 
@@ -327,7 +331,7 @@ def test_validate() -> None:
 def test_git_root() -> None:
     gr = git_root()
 
-    assert gr.exists() and gr.name == "commit-msg.py"
+    assert gr.exists() and (gr / "commit-msg.py").exists()
 
 
 def test_versions_compatible() -> None:
