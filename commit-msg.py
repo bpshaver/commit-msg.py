@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
 Python script to enforce conventional commits as a commit message Git hook.
 
